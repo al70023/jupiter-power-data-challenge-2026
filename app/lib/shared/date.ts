@@ -27,3 +27,7 @@ export function getSelectableDateRange(params: { timezone: string; maxDaysAhead:
   const end = start.plus({ days: maxDaysAhead });
   return { start, end };
 }
+
+export function formatDateInTz(dt: DateTime, timezone: string): string {
+  return dt.setZone(timezone).toISODate()!;
+}

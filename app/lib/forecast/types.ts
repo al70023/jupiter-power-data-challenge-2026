@@ -1,4 +1,4 @@
-export type Point15m = {
+export type NormalizedSlotPoint = {
   slot: number; // 0..95
   ts: string; // "YYYY-MM-DD HH:mm"
   price: number | null;

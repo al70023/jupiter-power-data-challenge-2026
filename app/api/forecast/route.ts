@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import type { ForecastApiErrorResponse, ForecastApiSuccessResponse } from "@/app/lib/api/forecast/types";
 import { fetchSppRange } from "@/app/lib/ercot/history";
 import { buildComparisonRows } from "@/app/lib/forecast/comparison";
 import { weeklyMedianForecast } from "@/app/lib/forecast/model";
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
     });
     const comparison = buildComparisonRows(forecast4w, forecast8w);
 
-    return NextResponse.json({
+    const response: ForecastApiSuccessResponse = {
       ok: true,
       date,
       settlementPoint: SETTLEMENT_POINT_HB_WEST,
@@ -86,23 +87,27 @@ export async function GET(req: Request) {
       forecast4w,
       forecast8w,
       comparison,
-    });
+    };
+
+    return NextResponse.json(response);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (/429|rate limit/i.test(message)) {
+      const response: ForecastApiErrorResponse = {
+        ok: false,
+        error: "UPSTREAM_RATE_LIMITED",
+        message,
+        hint: "ERCOT API rate limit hit. Retry shortly.",
+      };
       return NextResponse.json(
-        {
-          ok: false,
-          error: "UPSTREAM_RATE_LIMITED",
-          message,
-          hint: "ERCOT API rate limit hit. Retry shortly.",
-        },
+        response,
         { status: 503 }
       );
     }
 
+    const response: ForecastApiErrorResponse = { ok: false, error: "FORECAST_FAILED", message };
     return NextResponse.json(
-      { ok: false, error: "FORECAST_FAILED", message },
+      response,
       { status: 500 }
     );
   }

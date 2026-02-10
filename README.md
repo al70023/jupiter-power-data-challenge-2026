@@ -83,10 +83,12 @@ Error handling:
 
 - `app/lib/shared/`
   - cross-cutting helpers/constants (`date`, `number`, `env`, `http`)
+- `app/lib/api/`
+  - API contract DTOs shared between route and client consumers
 - `app/lib/ercot/`
   - ERCOT API client, field mapping, pagination history fetch, ERCOT-specific types/constants
 - `app/lib/forecast/`
-  - normalization, forecast model, side-by-side comparison builder, forecast types
+  - normalization, forecast model, side-by-side comparison builder, domain types
 - `app/api/forecast/route.ts`
   - thin route orchestration and response shaping
 

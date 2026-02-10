@@ -1,5 +1,5 @@
 import type { ErcotSppRow } from "@/app/lib/ercot/types";
-import type { Point15m } from "@/app/lib/forecast/types";
+import type { NormalizedSlotPoint } from "@/app/lib/forecast/types";
 
 function slotIndex(hour: number, interval: number): number {
   return (hour - 1) * 4 + (interval - 1);
@@ -12,8 +12,8 @@ function tsFromSlot(date: string, slot: number): string {
   return `${date} ${hh}:${mm}`;
 }
 
-export function to96SlotSeries(date: string, rows: ErcotSppRow[]): Point15m[] {
-  const series: Point15m[] = Array.from({ length: 96 }, (_, slot) => ({
+export function to96SlotSeries(date: string, rows: ErcotSppRow[]): NormalizedSlotPoint[] {
+  const series: NormalizedSlotPoint[] = Array.from({ length: 96 }, (_, slot) => ({
     slot,
     ts: tsFromSlot(date, slot),
     price: null,
@@ -25,7 +25,7 @@ export function to96SlotSeries(date: string, rows: ErcotSppRow[]): Point15m[] {
     const slot = slotIndex(row.deliveryHour, row.deliveryInterval);
     if (slot < 0 || slot > 95) continue;
 
-    const nextPoint: Point15m = {
+    const nextPoint: NormalizedSlotPoint = {
       slot,
       ts: tsFromSlot(date, slot),
       price: row.settlementPointPrice,
