@@ -1,5 +1,9 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
 import { formatNumber } from "@/app/lib/shared/number";
-import { ChartModel } from "@/app/components/types";
+import type { ChartMarker, ChartModel } from "@/app/components/types";
 
 type ForecastChartProps = {
   chartModel: ChartModel;
@@ -7,6 +11,26 @@ type ForecastChartProps = {
 
 export function ForecastChart(props: ForecastChartProps) {
   const { chartModel } = props;
+  const [hovered, setHovered] = useState<{ marker: ChartMarker } | null>(null);
+  const valuesBySlot = useMemo(() => {
+    const fourWeek = new Map<number, number>();
+    const eightWeek = new Map<number, number>();
+
+    for (const marker of chartModel.markers4w) fourWeek.set(marker.slot, marker.value);
+    for (const marker of chartModel.markers8w) eightWeek.set(marker.slot, marker.value);
+
+    return { fourWeek, eightWeek };
+  }, [chartModel.markers4w, chartModel.markers8w]);
+
+  const tooltip = useMemo(() => {
+    if (!hovered) return null;
+    const width = 170;
+    const height = 62;
+    const rawX = hovered.marker.x + 10;
+    const x = Math.min(rawX, chartModel.xMax - width);
+    const y = Math.max(chartModel.yMinPx + 4, hovered.marker.y - height - 8);
+    return { x, y, width, height };
+  }, [hovered, chartModel.xMax, chartModel.yMinPx]);
 
   return (
     <div className="mt-4 rounded border p-3">
@@ -30,6 +54,7 @@ export function ForecastChart(props: ForecastChartProps) {
           className="min-w-215 w-full"
           role="img"
           aria-label="4-week and 8-week forecast comparison chart"
+          onMouseLeave={() => setHovered(null)}
         >
           {chartModel.yTicks.map((tick, idx) => (
             <g key={`y-${idx}`}>
@@ -71,11 +96,59 @@ export function ForecastChart(props: ForecastChartProps) {
           <polyline fill="none" stroke="#2563eb" strokeWidth="2" points={chartModel.points4w} />
           <polyline fill="none" stroke="#059669" strokeWidth="2" points={chartModel.points8w} />
           {chartModel.markers4w.map((m, idx) => (
-            <circle key={`m4-${idx}`} cx={m.x} cy={m.y} r="2.5" fill="#2563eb" />
+            <circle
+              key={`m4-${idx}`}
+              cx={m.x}
+              cy={m.y}
+              r="3"
+              fill="#2563eb"
+              onMouseEnter={() => setHovered({ marker: m })}
+            />
           ))}
           {chartModel.markers8w.map((m, idx) => (
-            <circle key={`m8-${idx}`} cx={m.x} cy={m.y} r="2.5" fill="#059669" />
+            <circle
+              key={`m8-${idx}`}
+              cx={m.x}
+              cy={m.y}
+              r="3"
+              fill="#059669"
+              onMouseEnter={() => setHovered({ marker: m })}
+            />
           ))}
+
+          {hovered ? (
+            <line
+              x1={hovered.marker.x}
+              y1={chartModel.yMinPx}
+              x2={hovered.marker.x}
+              y2={chartModel.yMaxPx}
+              stroke="#9ca3af"
+              strokeDasharray="3 3"
+            />
+          ) : null}
+
+          {hovered && tooltip ? (
+            <g>
+              <rect
+                x={tooltip.x}
+                y={tooltip.y}
+                width={tooltip.width}
+                height={tooltip.height}
+                rx="4"
+                fill="#111827"
+                opacity="0.95"
+              />
+              <text x={tooltip.x + 8} y={tooltip.y + 15} fontSize="10" fill="#f9fafb">
+                {hovered.marker.ts}
+              </text>
+              <text x={tooltip.x + 8} y={tooltip.y + 30} fontSize="10" fill="#f9fafb">
+                4-Week: {formatNumber(valuesBySlot.fourWeek.get(hovered.marker.slot) ?? null)} $/MWh
+              </text>
+              <text x={tooltip.x + 8} y={tooltip.y + 44} fontSize="10" fill="#f9fafb">
+                8-Week: {formatNumber(valuesBySlot.eightWeek.get(hovered.marker.slot) ?? null)} $/MWh
+              </text>
+            </g>
+          ) : null}
 
           {chartModel.xTicks.map((tick, idx) => (
             <g key={`x-${idx}`}>

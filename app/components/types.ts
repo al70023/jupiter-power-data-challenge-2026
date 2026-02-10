@@ -1,5 +1,13 @@
 export type ViewMode = "chart" | "table" | "both";
 
+export type ChartMarker = {
+  slot: number;
+  ts: string;
+  x: number;
+  y: number;
+  value: number;
+};
+
 export type ChartModel = {
   width: number;
   height: number;
@@ -11,8 +19,8 @@ export type ChartModel = {
   maxY: number;
   yTicks: Array<{ value: number; y: number }>;
   xTicks: Array<{ slot: number; x: number; label: string }>;
-  markers4w: Array<{ x: number; y: number }>;
-  markers8w: Array<{ x: number; y: number }>;
+  markers4w: ChartMarker[];
+  markers8w: ChartMarker[];
   points4w: string;
   points8w: string;
 };

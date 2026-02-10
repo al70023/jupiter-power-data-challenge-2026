@@ -36,17 +36,29 @@ export function computeChartModel(rows: ComparisonPoint[]): ChartModel | null {
     .map((tick) => {
       const value = rows[tick.slot]?.value4w ?? null;
       if (value === null) return null;
-      return { x: tick.x, y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }) };
+      return {
+        slot: tick.slot,
+        ts: rows[tick.slot]?.ts ?? tick.label,
+        value,
+        x: tick.x,
+        y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }),
+      };
     })
-    .filter((m): m is { x: number; y: number } => m !== null);
+    .filter((m): m is { slot: number; ts: string; value: number; x: number; y: number } => m !== null);
 
   const markers8w = xTicks
     .map((tick) => {
       const value = rows[tick.slot]?.value8w ?? null;
       if (value === null) return null;
-      return { x: tick.x, y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }) };
+      return {
+        slot: tick.slot,
+        ts: rows[tick.slot]?.ts ?? tick.label,
+        value,
+        x: tick.x,
+        y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }),
+      };
     })
-    .filter((m): m is { x: number; y: number } => m !== null);
+    .filter((m): m is { slot: number; ts: string; value: number; x: number; y: number } => m !== null);
 
   return {
     width,
