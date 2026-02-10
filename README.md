@@ -1,23 +1,33 @@
 # Jupiter Power Data Challenge 2026
 
-Current implementation status for the ERCOT 15-minute forecast challenge.
+Current implementation status for the ERCOT 15-minute HB_WEST forecast app.
 
-## Scope Implemented So Far
+## What Is Implemented
 
-- Backend data pipeline for ERCOT NP6-905-CD (`spp_node_zone_hub`)
-- Forecast API endpoint for `HB_WEST`
-- 15-minute output format (`96` slots/day)
-- Dual forecast model: weekly median by slot for both 4-week and 8-week lookbacks
-- Retry/backoff handling for upstream ERCOT rate limits (`429`)
-- Unit/integration-style tests for normalization, forecast logic, pagination, retry behavior, and route contract
-
-UI is not implemented yet (current `app/page.tsx` is still placeholder).
+- ERCOT NP6-905-CD ingestion for `HB_WEST`
+- Forecast API: `GET /api/forecast?date=YYYY-MM-DD`
+- 96 interval outputs (15-minute cadence)
+- Dual model variants from same history window:
+  - `forecast4w` (weekly-median using 4 same-weekday lookbacks)
+  - `forecast8w` (weekly-median using 8 same-weekday lookbacks)
+- Comparison output per interval (`value4w`, `value8w`, `delta`)
+- Frontend page with:
+  - date picker (next 7 days)
+  - fetch action, loading/error states
+  - summary metrics
+  - view toggle (`Chart`, `Table`, `Both`)
+  - SVG chart with axis labels, ticks, and hover tooltip
+  - table view of interval rows
+- Upstream rate-limit handling (`429` -> `503 UPSTREAM_RATE_LIMITED`)
+- Test coverage for normalize/forecast/history/client/route behavior
 
 ## Tech Stack
 
-- Next.js (App Router, TypeScript)
+- Next.js App Router (TypeScript)
+- React
 - Luxon
-- Vitest (unit tests)
+- Tailwind CSS
+- Vitest
 
 ## Environment Variables
 
@@ -29,17 +39,16 @@ ERCOT_USERNAME="your_ercot_username"
 ERCOT_PASSWORD="your_ercot_password"
 ```
 
-## Main API
+## API Contract
 
 ### `GET /api/forecast?date=YYYY-MM-DD`
 
-Returns 15-minute forecast for `HB_WEST` for the requested date, including both 4-week and 8-week variants.
-
 Validation:
-- Date must be valid ISO format (`YYYY-MM-DD`)
-- Date must be within selectable 7-day window (today through today+6, `America/Chicago`)
 
-Response shape (abridged):
+- Date must parse as `YYYY-MM-DD`
+- Date must be within selectable window: today through today + 6 days (`America/Chicago`)
+
+Success response shape:
 
 ```json
 {
@@ -47,14 +56,19 @@ Response shape (abridged):
   "date": "2026-02-10",
   "settlementPoint": "HB_WEST",
   "timezone": "America/Chicago",
+  "model": {
+    "name": "weekly-median",
+    "historyDays": 56,
+    "variants": {
+      "forecast4w": { "lookbackWeeks": 4 },
+      "forecast8w": { "lookbackWeeks": 8 }
+    }
+  },
   "intervalMinutes": 15,
   "count": 96,
-  "forecast4w": [
-    { "slot": 0, "ts": "2026-02-10 00:00", "value": 33.06 }
-  ],
-  "forecast8w": [
-    { "slot": 0, "ts": "2026-02-10 00:00", "value": 32.81 }
-  ],
+  "forecast": [{ "slot": 0, "ts": "2026-02-10 00:00", "value": 33.06 }],
+  "forecast4w": [{ "slot": 0, "ts": "2026-02-10 00:00", "value": 33.06 }],
+  "forecast8w": [{ "slot": 0, "ts": "2026-02-10 00:00", "value": 32.81 }],
   "comparison": [
     {
       "slot": 0,
@@ -63,81 +77,66 @@ Response shape (abridged):
       "value8w": 32.81,
       "delta": 0.25
     }
-  ],
-  "forecast": [
-    { "slot": 0, "ts": "2026-02-10 00:00", "value": 33.06 }
   ]
 }
 ```
 
 Notes:
-- `forecast` is kept as an alias of `forecast4w` for backward compatibility.
 
-Error handling:
+- `forecast` is an alias of `forecast4w` for backward compatibility.
+
+Error responses:
+
 - `400 INVALID_DATE`
 - `400 DATE_OUT_OF_RANGE`
-- `503 UPSTREAM_RATE_LIMITED` (ERCOT throttling)
+- `503 UPSTREAM_RATE_LIMITED`
 - `500 FORECAST_FAILED`
 
-## Code Organization
+## Forecast Method (Current)
 
-- `app/lib/shared/`
-  - cross-cutting helpers/constants (`date`, `number`, `env`, `http`)
-- `app/lib/api/`
-  - API contract DTOs shared between route and client consumers
-- `app/lib/ercot/`
-  - ERCOT API client, field mapping, pagination history fetch, ERCOT-specific types/constants
-- `app/lib/forecast/`
-  - normalization, forecast model, side-by-side comparison builder, domain types
+- History window fetched: prior `56` days ending at target date - 1 day
+- For each 15-minute slot:
+  - 4-week variant: median from last 4 same-weekday dates
+  - 8-week variant: median from last 8 same-weekday dates
+- Output rounded to 2 decimals
+- `delta = value4w - value8w`
+
+## DST Duplicate Handling (Current)
+
+When duplicate slot keys occur on fallback DST dates, normalization prefers `DSTFlag=false` over `DSTFlag=true` when both exist for the same slot.
+
+## Project Structure
+
 - `app/api/forecast/route.ts`
-  - thin route orchestration and response shaping
+  - Request validation + orchestration
+- `app/lib/api/forecast/types.ts`
+  - API DTOs/contracts
+- `app/lib/ercot/*`
+  - ERCOT client, pagination/history fetch, ERCOT-specific types
+- `app/lib/forecast/*`
+  - normalization, model, comparison, domain types
+- `app/lib/shared/*`
+  - shared constants/helpers (`date`, `number`, `http`, `env`)
+- `app/components/*`
+  - `ForecastControls`, `ForecastSummary`, `ForecastViewToggle`, `ForecastChart`, `ForecastTable`, chart model mapping
+- `app/page.tsx`
+  - page-level state and component wiring
 
-## Forecast Logic (Current)
+## Tests
 
-- Pulls historical rows for the prior `56` days ending at target date minus 1 day
-- Computes two variants from the same fetched history:
-  - `4-week`: last `4` same-weekday dates
-  - `8-week`: last `8` same-weekday dates
-- Normalizes to 96 slots/day
-- Computes per-slot median, rounds to 2 decimals, and includes `delta = value4w - value8w`
+Current tests live under `__tests__` directories:
 
-## DST Handling (Current)
+- `app/lib/__tests__/normalize.test.ts`
+- `app/lib/__tests__/forecast.test.ts`
+- `app/lib/__tests__/history.test.ts`
+- `app/lib/__tests__/ercot-client.test.ts`
+- `app/api/forecast/__tests__/route.test.ts`
 
-In normalization, duplicate slot keys can occur on fallback DST dates.
-
-Current policy:
-- Prefer `DSTFlag=false` over `DSTFlag=true` when both appear for the same slot
-- This makes fallback duplicate handling deterministic for the common duplicate pair case
-
-## Testing
-
-Run tests:
+Run:
 
 ```bash
 npm test
 ```
-
-Test layout:
-- tests are organized under `__tests__` directories
-
-Current tests:
-- `app/lib/__tests__/normalize.test.ts`
-  - standard slot mapping
-  - duplicate handling preference (`DSTFlag=false`)
-  - documented same-flag duplicate behavior
-- `app/lib/__tests__/forecast.test.ts`
-  - median/rounding correctness
-  - lookback window behavior (`4w` vs `8w`)
-- `app/lib/__tests__/history.test.ts`
-  - multi-page fetch aggregation
-  - single-page fallback behavior
-- `app/lib/__tests__/ercot-client.test.ts`
-  - retry behavior on `429`
-  - fail-fast behavior on non-retryable `400`
-- `app/api/forecast/__tests__/route.test.ts`
-  - request validation
-  - dual-forecast response contract
-  - upstream rate-limit error mapping (`503`)
 
 ## Run Locally
 
@@ -146,11 +145,11 @@ npm install
 npm run dev
 ```
 
-Then open:
-- `http://localhost:3000/api/forecast?date=YYYY-MM-DD`
+Open:
 
-## Known Gaps / Next Work
+- App UI: `http://localhost:3000`
+- API example: `http://localhost:3000/api/forecast?date=2026-02-10`
 
-- Build frontend UX (date picker + table/chart)
-- Add model performance/diagnostic display
-- Continue improving README as features are added
+## Next Planned Phase
+
+- Backtesting mode to compare forecasted values vs actual historical prices and report MAE/RMSE/bias.

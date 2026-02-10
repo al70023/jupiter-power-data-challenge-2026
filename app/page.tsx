@@ -87,6 +87,12 @@ export default function Home() {
           ) : null}
         </section>
       ) : null}
+
+      {!result && !loading && !error ? (
+        <section className="mt-4 rounded border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+          Choose a date within the next 7 days and click <strong>Fetch Forecast</strong> to load the 4-week-median and 8-week-median forecasts.
+        </section>
+      ) : null}
     </main>
   );
 }
