@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import type { ForecastApiResponse, ForecastApiSuccessResponse } from "@/app/lib/api/forecast/types";
 import { APP_TIMEZONE } from "@/app/lib/shared/constants";
 import { formatDateInTz } from "@/app/lib/shared/date";
+import { computeComparisonSummary } from "@/app/lib/forecast/comparison";
 
 function formatNumber(value: number | null): string {
   if (value === null) return "-";
@@ -21,6 +22,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ForecastApiSuccessResponse | null>(null);
+  const summary = useMemo(
+    () => (result ? computeComparisonSummary(result.comparison) : null),
+    [result]
+  );
 
   async function fetchForecast(date: string) {
     setLoading(true);
@@ -86,6 +91,20 @@ export default function Home() {
           <p className="mt-1 text-gray-700">
             Model: Weekly Median using 4-Week and 8-Week histories
           </p>
+
+          {summary ? (
+            <div className="mt-3 grid gap-2 rounded border bg-gray-50 p-3 sm:grid-cols-3">
+              <p>
+                Avg Delta: <strong>{formatNumber(summary.avgDelta)}</strong>
+              </p>
+              <p>
+                Max |Delta|: <strong>{formatNumber(summary.maxAbsDelta)}</strong>
+              </p>
+              <p>
+                Non-null intervals: <strong>{summary.nonNullCount}</strong> / {result.count}
+              </p>
+            </div>
+          ) : null}
 
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full border-collapse text-left text-xs">

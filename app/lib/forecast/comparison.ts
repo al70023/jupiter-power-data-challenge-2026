@@ -22,3 +22,23 @@ export function buildComparisonRows(
     };
   });
 }
+
+export function computeComparisonSummary(rows: ComparisonPoint[]) {
+  let nonNullCount = 0;
+  let deltaSum = 0;
+  let maxAbsDelta: number | null = null;
+
+  for (const row of rows) {
+    if (row.delta === null) continue;
+    nonNullCount += 1;
+    deltaSum += row.delta;
+    const absDelta = Math.abs(row.delta);
+    maxAbsDelta = maxAbsDelta === null ? absDelta : Math.max(maxAbsDelta, absDelta);
+  }
+
+  return {
+    nonNullCount,
+    avgDelta: nonNullCount > 0 ? deltaSum / nonNullCount : null,
+    maxAbsDelta,
+  };
+}
