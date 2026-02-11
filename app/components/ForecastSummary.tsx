@@ -13,22 +13,25 @@ export function ForecastSummary(props: ForecastSummaryProps) {
   return (
     <>
       <p>
-        Forecast date: <strong>{result.date}</strong>
+        Forecast target date: <strong>{result.date}</strong>
       </p>
       <p className="mt-1">
         Intervals: <strong>{result.count}</strong> (15-minute)
       </p>
       <p className="mt-1 text-gray-700">Model: Weekly Median using 4-Week and 8-Week histories</p>
+      <p className="mt-1 text-gray-700">
+        Comparison units: $/MWh. Delta = 4-week forecast - 8-week forecast.
+      </p>
 
       <div className="mt-3 grid gap-2 rounded border bg-gray-50 p-3 sm:grid-cols-3">
         <p>
-          Avg Delta: <strong>{formatNumber(summary.avgDelta)}</strong>
+          Average Delta (4-Week - 8-Week): <strong>{formatNumber(summary.avgDelta)}</strong>
         </p>
         <p>
-          Max |Delta|: <strong>{formatNumber(summary.maxAbsDelta)}</strong>
+          Maximum Absolute Delta: <strong>{formatNumber(summary.maxAbsDelta)}</strong>
         </p>
         <p>
-          Non-null intervals: <strong>{summary.nonNullCount}</strong> / {result.count}
+          Coverage (intervals with both forecasts): <strong>{summary.nonNullCount}</strong> / {result.count}
         </p>
       </div>
     </>

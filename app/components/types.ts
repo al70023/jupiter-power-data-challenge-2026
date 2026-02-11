@@ -1,4 +1,5 @@
 export type ViewMode = "chart" | "table" | "both";
+export type PageMode = "forecast" | "backtest";
 
 export type ChartMarker = {
   slot: number;

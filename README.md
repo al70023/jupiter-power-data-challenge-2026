@@ -14,11 +14,13 @@ Current implementation status for the ERCOT 15-minute HB_WEST forecast app.
 - Comparison output per interval (`value4w`, `value8w`, `delta`)
 - Frontend page with:
   - date picker (next 7 days)
+  - mode toggle (`Forecast`, `Backtest`)
   - fetch action, loading/error states
   - summary metrics
   - view toggle (`Chart`, `Table`, `Both`)
   - SVG chart with axis labels, ticks, and hover tooltip
   - table view of interval rows
+  - backtest metrics panel + forecast-vs-actual interval table
 - Upstream rate-limit handling (`429` -> `503 UPSTREAM_RATE_LIMITED`)
 - Test coverage for normalize/forecast/history/client/route behavior
 
@@ -216,4 +218,4 @@ Open:
 
 ## Next Planned Phase
 
-- Surface backtest mode in UI (forecast-vs-actual chart/table + metrics panel).
+- Add backtest chart view (overlay actual vs forecast curves).

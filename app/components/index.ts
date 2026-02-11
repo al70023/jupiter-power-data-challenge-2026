@@ -1,8 +1,12 @@
+export { BacktestSummary } from "./BacktestSummary";
+export { BacktestTable } from "./BacktestTable";
 export { computeChartModel } from "./chart-model";
 export { ForecastChart } from "./ForecastChart";
 export { ForecastControls } from "./ForecastControls";
 export { ForecastSummary } from "./ForecastSummary";
 export { ForecastTable } from "./ForecastTable";
 export { ForecastViewToggle } from "./ForecastViewToggle";
+export { PageModeToggle } from "./PageModeToggle";
+export type { PageMode } from "./types";
 export type { ViewMode } from "./types";
 export type { ChartModel } from "./types";
