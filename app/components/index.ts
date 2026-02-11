@@ -1,6 +1,6 @@
 export { BacktestSummary } from "./BacktestSummary";
 export { BacktestTable } from "./BacktestTable";
-export { computeChartModel } from "./chart-model";
+export { computeBacktestChartModel, computeChartModel } from "./chart-model";
 export { ForecastChart } from "./ForecastChart";
 export { ForecastControls } from "./ForecastControls";
 export { ForecastSummary } from "./ForecastSummary";

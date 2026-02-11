@@ -9,6 +9,14 @@ export type ChartMarker = {
   value: number;
 };
 
+export type ChartSeries = {
+  key: string;
+  label: string;
+  color: string;
+  points: string;
+  markers: ChartMarker[];
+};
+
 export type ChartModel = {
   width: number;
   height: number;
@@ -20,8 +28,5 @@ export type ChartModel = {
   maxY: number;
   yTicks: Array<{ value: number; y: number }>;
   xTicks: Array<{ slot: number; x: number; label: string }>;
-  markers4w: ChartMarker[];
-  markers8w: ChartMarker[];
-  points4w: string;
-  points8w: string;
+  series: ChartSeries[];
 };

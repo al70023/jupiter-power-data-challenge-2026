@@ -7,43 +7,45 @@ import type { ChartMarker, ChartModel } from "@/app/components/types";
 
 type ForecastChartProps = {
   chartModel: ChartModel;
+  title?: string;
+  ariaLabel?: string;
+  tooltipExtraLinesForSlot?: (slot: number) => string[];
 };
 
 export function ForecastChart(props: ForecastChartProps) {
-  const { chartModel } = props;
+  const { chartModel, title = "Forecast Curves", ariaLabel, tooltipExtraLinesForSlot } = props;
   const [hovered, setHovered] = useState<{ marker: ChartMarker } | null>(null);
   const valuesBySlot = useMemo(() => {
-    const fourWeek = new Map<number, number>();
-    const eightWeek = new Map<number, number>();
-
-    for (const marker of chartModel.markers4w) fourWeek.set(marker.slot, marker.value);
-    for (const marker of chartModel.markers8w) eightWeek.set(marker.slot, marker.value);
-
-    return { fourWeek, eightWeek };
-  }, [chartModel.markers4w, chartModel.markers8w]);
+    const maps = new Map<string, Map<number, number>>();
+    for (const series of chartModel.series) {
+      const slotMap = new Map<number, number>();
+      for (const marker of series.markers) slotMap.set(marker.slot, marker.value);
+      maps.set(series.key, slotMap);
+    }
+    return maps;
+  }, [chartModel.series]);
 
   const tooltip = useMemo(() => {
     if (!hovered) return null;
-    const width = 170;
-    const height = 62;
+    const extraCount = tooltipExtraLinesForSlot?.(hovered.marker.slot).length ?? 0;
+    const width = 280;
+    const height = 32 + chartModel.series.length * 14 + extraCount * 14;
     const rawX = hovered.marker.x + 10;
     const x = Math.min(rawX, chartModel.xMax - width);
     const y = Math.max(chartModel.yMinPx + 4, hovered.marker.y - height - 8);
     return { x, y, width, height };
-  }, [hovered, chartModel.xMax, chartModel.yMinPx]);
+  }, [hovered, chartModel.xMax, chartModel.yMinPx, chartModel.series.length, tooltipExtraLinesForSlot]);
 
   return (
     <div className="mt-4 rounded border p-3">
       <div className="mb-2 flex flex-wrap items-center gap-4 text-xs">
-        <span className="font-semibold">Forecast Curves</span>
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2 w-6 rounded bg-blue-600" />
-          4-Week
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2 w-6 rounded bg-emerald-600" />
-          8-Week
-        </span>
+        <span className="font-semibold">{title}</span>
+        {chartModel.series.map((series) => (
+          <span key={series.key} className="inline-flex items-center gap-1">
+            <span className="h-2 w-6 rounded" style={{ backgroundColor: series.color }} />
+            {series.label}
+          </span>
+        ))}
         <span className="text-gray-600">
           Y range: {formatNumber(chartModel.minY)} to {formatNumber(chartModel.maxY)} ($/MWh)
         </span>
@@ -53,7 +55,7 @@ export function ForecastChart(props: ForecastChartProps) {
           viewBox={`0 0 ${chartModel.width} ${chartModel.height}`}
           className="min-w-215 w-full"
           role="img"
-          aria-label="4-week and 8-week forecast comparison chart"
+          aria-label={ariaLabel ?? "price comparison chart"}
           onMouseLeave={() => setHovered(null)}
         >
           {chartModel.yTicks.map((tick, idx) => (
@@ -93,27 +95,20 @@ export function ForecastChart(props: ForecastChartProps) {
             stroke="#9ca3af"
             strokeWidth="1"
           />
-          <polyline fill="none" stroke="#2563eb" strokeWidth="2" points={chartModel.points4w} />
-          <polyline fill="none" stroke="#059669" strokeWidth="2" points={chartModel.points8w} />
-          {chartModel.markers4w.map((m, idx) => (
-            <circle
-              key={`m4-${idx}`}
-              cx={m.x}
-              cy={m.y}
-              r="3"
-              fill="#2563eb"
-              onMouseEnter={() => setHovered({ marker: m })}
-            />
-          ))}
-          {chartModel.markers8w.map((m, idx) => (
-            <circle
-              key={`m8-${idx}`}
-              cx={m.x}
-              cy={m.y}
-              r="3"
-              fill="#059669"
-              onMouseEnter={() => setHovered({ marker: m })}
-            />
+          {chartModel.series.map((series) => (
+            <g key={series.key}>
+              <polyline fill="none" stroke={series.color} strokeWidth="2" points={series.points} />
+              {series.markers.map((m, idx) => (
+                <circle
+                  key={`${series.key}-${idx}`}
+                  cx={m.x}
+                  cy={m.y}
+                  r="3"
+                  fill={series.color}
+                  onMouseEnter={() => setHovered({ marker: m })}
+                />
+              ))}
+            </g>
           ))}
 
           {hovered ? (
@@ -141,12 +136,22 @@ export function ForecastChart(props: ForecastChartProps) {
               <text x={tooltip.x + 8} y={tooltip.y + 15} fontSize="10" fill="#f9fafb">
                 {hovered.marker.ts}
               </text>
-              <text x={tooltip.x + 8} y={tooltip.y + 30} fontSize="10" fill="#f9fafb">
-                4-Week: {formatNumber(valuesBySlot.fourWeek.get(hovered.marker.slot) ?? null)} $/MWh
-              </text>
-              <text x={tooltip.x + 8} y={tooltip.y + 44} fontSize="10" fill="#f9fafb">
-                8-Week: {formatNumber(valuesBySlot.eightWeek.get(hovered.marker.slot) ?? null)} $/MWh
-              </text>
+              {chartModel.series.map((series, idx) => (
+                <text key={series.key} x={tooltip.x + 8} y={tooltip.y + 30 + idx * 14} fontSize="10" fill="#f9fafb">
+                  {series.label}: {formatNumber(valuesBySlot.get(series.key)?.get(hovered.marker.slot) ?? null)} $/MWh
+                </text>
+              ))}
+              {(tooltipExtraLinesForSlot?.(hovered.marker.slot) ?? []).map((line, idx) => (
+                <text
+                  key={`extra-${idx}`}
+                  x={tooltip.x + 8}
+                  y={tooltip.y + 30 + chartModel.series.length * 14 + idx * 14}
+                  fontSize="10"
+                  fill="#f9fafb"
+                >
+                  {line}
+                </text>
+              ))}
             </g>
           ) : null}
 

@@ -21,6 +21,7 @@ Current implementation status for the ERCOT 15-minute HB_WEST forecast app.
   - SVG chart with axis labels, ticks, and hover tooltip
   - table view of interval rows
   - backtest metrics panel + forecast-vs-actual interval table
+  - backtest overlay chart (`Actual`, `4-Week`, `8-Week`) with hover details
 - Upstream rate-limit handling (`429` -> `503 UPSTREAM_RATE_LIMITED`)
 - Test coverage for normalize/forecast/history/client/route behavior
 
@@ -218,4 +219,4 @@ Open:
 
 ## Next Planned Phase
 
-- Add backtest chart view (overlay actual vs forecast curves).
+- Add optional backtest error chart mode (absolute error curves for 4-week vs 8-week).

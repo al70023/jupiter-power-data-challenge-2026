@@ -4,11 +4,12 @@ import { DateTime } from "luxon";
 import { useEffect, useMemo, useState } from "react";
 
 import type { ForecastApiResponse, ForecastApiSuccessResponse } from "@/app/lib/api/forecast/types";
-import type { BacktestApiResponse, BacktestApiSuccessResponse } from "@/app/lib/api/backtest/types";
+import type { BacktestApiResponse, BacktestApiSuccessResponse, BacktestIntervalRow } from "@/app/lib/api/backtest/types";
 import type { PageMode, ViewMode } from "@/app/components";
 import { APP_TIMEZONE } from "@/app/lib/shared/constants";
 import { formatDateInTz } from "@/app/lib/shared/date";
 import { 
+  computeBacktestChartModel,
   BacktestSummary,
   BacktestTable,
   computeChartModel,
@@ -36,11 +37,22 @@ export default function Home() {
   const [forecastResult, setForecastResult] = useState<ForecastApiSuccessResponse | null>(null);
   const [backtestResult, setBacktestResult] = useState<BacktestApiSuccessResponse | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
+  const [backtestViewMode, setBacktestViewMode] = useState<ViewMode>("chart");
 
   const chartModel = useMemo(
     () => (forecastResult ? computeChartModel(forecastResult.comparison) : null),
     [forecastResult]
   );
+  const backtestChartModel = useMemo(
+    () => (backtestResult ? computeBacktestChartModel(backtestResult.rows) : null),
+    [backtestResult]
+  );
+  const backtestRowBySlot = useMemo(() => {
+    const m = new Map<number, BacktestIntervalRow>();
+    if (!backtestResult) return m;
+    for (const row of backtestResult.rows) m.set(row.slot, row);
+    return m;
+  }, [backtestResult]);
 
   useEffect(() => {
     if (pageMode === "forecast") {
@@ -125,7 +137,11 @@ export default function Home() {
           <ForecastViewToggle value={viewMode} onChange={setViewMode} />
 
           {(viewMode === "chart" || viewMode === "both") && chartModel ? (
-            <ForecastChart chartModel={chartModel} />
+            <ForecastChart
+              chartModel={chartModel}
+              title="Forecast Curves"
+              ariaLabel="4-week and 8-week forecast comparison chart"
+            />
           ) : null}
 
           {viewMode === "table" || viewMode === "both" ? (
@@ -137,7 +153,27 @@ export default function Home() {
       {pageMode === "backtest" && backtestResult ? (
         <section className="mt-4 rounded border p-4 text-sm">
           <BacktestSummary result={backtestResult} />
-          <BacktestTable rows={backtestResult.rows} />
+          <ForecastViewToggle value={backtestViewMode} onChange={setBacktestViewMode} />
+
+          {(backtestViewMode === "chart" || backtestViewMode === "both") && backtestChartModel ? (
+            <ForecastChart
+              chartModel={backtestChartModel}
+              title="Backtest Curves"
+              ariaLabel="backtest chart showing forecast and actual prices"
+              tooltipExtraLinesForSlot={(slot) => {
+                const row = backtestRowBySlot.get(slot);
+                if (!row) return [];
+                return [
+                  `Error 4-Weeks: ${row.err4w === null ? "-" : row.err4w.toFixed(2)}`, 
+                  `Error 8-Weeks: ${row.err8w === null ? "-" : row.err8w.toFixed(2)}`,
+                ];
+              }}
+            />
+          ) : null}
+
+          {backtestViewMode === "table" || backtestViewMode === "both" ? (
+            <BacktestTable rows={backtestResult.rows} />
+          ) : null}
         </section>
       ) : null}
 

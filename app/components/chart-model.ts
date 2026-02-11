@@ -1,8 +1,32 @@
+import type { BacktestIntervalRow } from "@/app/lib/api/backtest/types";
 import type { ComparisonPoint } from "@/app/lib/forecast/types";
 import type { ChartModel } from "@/app/components/types";
 
 export function computeChartModel(rows: ComparisonPoint[]): ChartModel | null {
-  const values = rows.flatMap((row) => [row.value4w, row.value8w]).filter((v): v is number => v !== null);
+  return computeGenericChartModel(rows, [
+    { key: "4w", label: "4-Week Forecast", color: "#2563eb", pick: (row) => row.value4w },
+    { key: "8w", label: "8-Week Forecast", color: "#059669", pick: (row) => row.value8w },
+  ]);
+}
+
+export function computeBacktestChartModel(rows: BacktestIntervalRow[]): ChartModel | null {
+  return computeGenericChartModel(rows, [
+    { key: "4w", label: "4-Week Forecast", color: "#2563eb", pick: (row) => row.forecast4w },
+    { key: "8w", label: "8-Week Forecast", color: "#059669", pick: (row) => row.forecast8w },
+    { key: "actual", label: "Actual ERCOT Price", color: "#d97706", pick: (row) => row.actual },
+  ]);
+}
+
+function computeGenericChartModel<T extends { slot: number; ts: string }>(
+  rows: T[],
+  defs: Array<{
+    key: string;
+    label: string;
+    color: string;
+    pick: (row: T) => number | null;
+  }>
+): ChartModel | null {
+  const values = rows.flatMap((row) => defs.map((def) => def.pick(row))).filter((v): v is number => v !== null);
   if (values.length === 0) return null;
 
   const width = 960;
@@ -32,33 +56,36 @@ export function computeChartModel(rows: ComparisonPoint[]): ChartModel | null {
     return { slot, x, label: `${hh}:${mm}` };
   });
 
-  const markers4w = xTicks
-    .map((tick) => {
-      const value = rows[tick.slot]?.value4w ?? null;
-      if (value === null) return null;
-      return {
-        slot: tick.slot,
-        ts: rows[tick.slot]?.ts ?? tick.label,
-        value,
-        x: tick.x,
-        y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }),
-      };
-    })
-    .filter((m): m is { slot: number; ts: string; value: number; x: number; y: number } => m !== null);
-
-  const markers8w = xTicks
-    .map((tick) => {
-      const value = rows[tick.slot]?.value8w ?? null;
-      if (value === null) return null;
-      return {
-        slot: tick.slot,
-        ts: rows[tick.slot]?.ts ?? tick.label,
-        value,
-        x: tick.x,
-        y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }),
-      };
-    })
-    .filter((m): m is { slot: number; ts: string; value: number; x: number; y: number } => m !== null);
+  const series = defs.map((def) => ({
+    key: def.key,
+    label: def.label,
+    color: def.color,
+    markers: xTicks
+      .map((tick) => {
+        const row = rows[tick.slot];
+        if (!row) return null;
+        const value = def.pick(row);
+        if (value === null) return null;
+        return {
+          slot: tick.slot,
+          ts: row.ts ?? tick.label,
+          value,
+          x: tick.x,
+          y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }),
+        };
+      })
+      .filter((m): m is { slot: number; ts: string; value: number; x: number; y: number } => m !== null),
+    points: buildSeriesPoints({
+      rows,
+      xMin,
+      xMax,
+      yMinPx,
+      yMaxPx,
+      minY,
+      maxY,
+      pick: def.pick,
+    }),
+  }));
 
   return {
     width,
@@ -71,40 +98,19 @@ export function computeChartModel(rows: ComparisonPoint[]): ChartModel | null {
     maxY,
     yTicks,
     xTicks,
-    markers4w,
-    markers8w,
-    points4w: buildSeriesPoints({
-      rows,
-      xMin,
-      xMax,
-      yMinPx,
-      yMaxPx,
-      minY,
-      maxY,
-      pick: (row) => row.value4w,
-    }),
-    points8w: buildSeriesPoints({
-      rows,
-      xMin,
-      xMax,
-      yMinPx,
-      yMaxPx,
-      minY,
-      maxY,
-      pick: (row) => row.value8w,
-    }),
+    series,
   };
 }
 
-function buildSeriesPoints(params: {
-  rows: ComparisonPoint[];
+function buildSeriesPoints<T>(params: {
+  rows: T[];
   xMin: number;
   xMax: number;
   yMinPx: number;
   yMaxPx: number;
   minY: number;
   maxY: number;
-  pick: (row: ComparisonPoint) => number | null;
+  pick: (row: T) => number | null;
 }): string {
   const { rows, xMin, xMax, yMinPx, yMaxPx, minY, maxY, pick } = params;
   const denom = Math.max(rows.length - 1, 1);
