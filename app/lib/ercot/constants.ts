@@ -7,3 +7,4 @@ export const ERCOT_PRODUCT_PATH = "np6-905-cd/spp_node_zone_hub";
 
 export const ERCOT_MAX_HTTP_RETRIES = 5;
 export const ERCOT_BASE_RETRY_MS = 400;
+export const ERCOT_HTTP_TIMEOUT_MS = 12_000;

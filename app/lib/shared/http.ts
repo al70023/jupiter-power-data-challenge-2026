@@ -24,11 +24,27 @@ export async function fetchWithRetry(params: {
   label: string;
   maxRetries: number;
   baseRetryMs: number;
+  timeoutMs?: number;
 }): Promise<Response> {
-  const { input, init, label, maxRetries, baseRetryMs } = params;
+  const { input, init, label, maxRetries, baseRetryMs, timeoutMs = 15_000 } = params;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await fetch(input, init);
+    let res: Response;
+    try {
+      res = await fetchWithTimeout({ input, init, timeoutMs });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const retryable = isRetryableTransportError(err);
+      if (!retryable || attempt === maxRetries) {
+        throw new Error(`${label} failed: ${message}`);
+      }
+
+      const expBackoff = baseRetryMs * 2 ** attempt;
+      const jitter = Math.floor(Math.random() * 150);
+      await sleep(expBackoff + jitter);
+      continue;
+    }
+
     if (res.ok) return res;
 
     const text = await res.text().catch(() => "");
@@ -45,4 +61,33 @@ export async function fetchWithRetry(params: {
   }
 
   throw new Error(`${label} failed: retries exhausted`);
+}
+
+async function fetchWithTimeout(params: {
+  input: string;
+  init: RequestInit;
+  timeoutMs: number;
+}): Promise<Response> {
+  const { input, init, timeoutMs } = params;
+  const timeoutController = new AbortController();
+  const upstreamSignal = init.signal;
+
+  const abortFromUpstream = () => timeoutController.abort();
+  if (upstreamSignal?.aborted) timeoutController.abort();
+  else if (upstreamSignal) upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
+
+  const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: timeoutController.signal });
+  } finally {
+    clearTimeout(timeoutId);
+    if (upstreamSignal) upstreamSignal.removeEventListener("abort", abortFromUpstream);
+  }
+}
+
+function isRetryableTransportError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === "AbortError") return true;
+  if (/abort|timed?\s*out|network|fetch failed|socket/i.test(err.message)) return true;
+  return false;
 }

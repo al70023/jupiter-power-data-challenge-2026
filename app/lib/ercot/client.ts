@@ -2,6 +2,7 @@ import {
   ERCOT_BASE_RETRY_MS,
   ERCOT_BASE_URL,
   ERCOT_CLIENT_ID,
+  ERCOT_HTTP_TIMEOUT_MS,
   ERCOT_MAX_HTTP_RETRIES,
   ERCOT_PRODUCT_PATH,
   ERCOT_SCOPE,
@@ -42,6 +43,7 @@ export async function fetchSppNodeZoneHub(params: {
     label: "ERCOT data",
     maxRetries: ERCOT_MAX_HTTP_RETRIES,
     baseRetryMs: ERCOT_BASE_RETRY_MS,
+    timeoutMs: ERCOT_HTTP_TIMEOUT_MS,
   });
 
   const raw = (await res.json()) as ErcotRawResponse;
@@ -78,6 +80,7 @@ async function getIdTokenCached(): Promise<string> {
     label: "ERCOT token",
     maxRetries: ERCOT_MAX_HTTP_RETRIES,
     baseRetryMs: ERCOT_BASE_RETRY_MS,
+    timeoutMs: ERCOT_HTTP_TIMEOUT_MS,
   });
 
   const json = (await res.json()) as { id_token?: string };

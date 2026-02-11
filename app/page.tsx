@@ -16,6 +16,8 @@ import {
   ViewMode,
 } from "@/app/components";
 
+const FORECAST_REQUEST_TIMEOUT_MS = 30_000;
+
 export default function Home() {
   const today = useMemo(() => DateTime.now().setZone(APP_TIMEZONE).startOf("day"), []);
   const minDate = useMemo(() => formatDateInTz(today, APP_TIMEZONE), [today]);
@@ -37,8 +39,14 @@ export default function Home() {
     setError(null);
     setResult(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FORECAST_REQUEST_TIMEOUT_MS);
+
     try {
-      const res = await fetch(`/api/forecast?date=${encodeURIComponent(date)}`, { cache: "no-store" });
+      const res = await fetch(`/api/forecast?date=${encodeURIComponent(date)}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       const json = (await res.json()) as ForecastApiResponse;
       if (!json.ok) {
         setError(json.message ?? json.hint ?? json.error ?? "Request failed");
@@ -49,9 +57,14 @@ export default function Home() {
         return;
       }
       setResult(json);
-    } catch {
-      setError("Network error while fetching forecast.");
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("Request timed out. Please retry in a few seconds.");
+      } else {
+        setError("Network error while fetching forecast.");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }
