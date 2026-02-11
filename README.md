@@ -6,6 +6,7 @@ Current implementation status for the ERCOT 15-minute HB_WEST forecast app.
 
 - ERCOT NP6-905-CD ingestion for `HB_WEST`
 - Forecast API: `GET /api/forecast?date=YYYY-MM-DD`
+- Backtest API: `GET /api/backtest?date=YYYY-MM-DD` (historical dates only)
 - 96 interval outputs (15-minute cadence)
 - Dual model variants from same history window:
   - `forecast4w` (weekly-median using 4 same-weekday lookbacks)
@@ -92,6 +93,64 @@ Error responses:
 - `503 UPSTREAM_RATE_LIMITED`
 - `500 FORECAST_FAILED`
 
+### `GET /api/backtest?date=YYYY-MM-DD`
+
+Validation:
+
+- Date must parse as `YYYY-MM-DD`
+- Date must be historical (strictly before today in `America/Chicago`)
+
+Success response shape:
+
+```json
+{
+  "ok": true,
+  "date": "2026-02-10",
+  "settlementPoint": "HB_WEST",
+  "timezone": "America/Chicago",
+  "intervalMinutes": 15,
+  "count": 96,
+  "model": {
+    "name": "weekly-median",
+    "historyDays": 56,
+    "variants": {
+      "forecast4w": { "lookbackWeeks": 4 },
+      "forecast8w": { "lookbackWeeks": 8 }
+    }
+  },
+  "metrics": {
+    "mae4w": 3.02,
+    "mae8w": 3.54,
+    "rmse4w": 4.11,
+    "rmse8w": 4.88,
+    "bias4w": 0.42,
+    "bias8w": -0.17,
+    "coverage4w": 96,
+    "coverage8w": 96
+  },
+  "rows": [
+    {
+      "slot": 0,
+      "ts": "2026-02-10 00:00",
+      "forecast4w": 33.06,
+      "forecast8w": 32.81,
+      "actual": 31.2,
+      "err4w": 1.86,
+      "err8w": 1.61,
+      "absErr4w": 1.86,
+      "absErr8w": 1.61
+    }
+  ]
+}
+```
+
+Error responses:
+
+- `400 INVALID_DATE`
+- `400 DATE_NOT_HISTORICAL`
+- `503 UPSTREAM_RATE_LIMITED`
+- `500 BACKTEST_FAILED`
+
 ## Forecast Method (Current)
 
 - History window fetched: prior `56` days ending at target date - 1 day
@@ -109,8 +168,12 @@ When duplicate slot keys occur on fallback DST dates, normalization prefers `DST
 
 - `app/api/forecast/route.ts`
   - Request validation + orchestration
+- `app/api/backtest/route.ts`
+  - Historical backtest route (forecast vs actual interval joins)
 - `app/lib/api/forecast/types.ts`
   - API DTOs/contracts
+- `app/lib/api/backtest/types.ts`
+  - Backtest API DTOs/contracts
 - `app/lib/ercot/*`
   - ERCOT client, pagination/history fetch, ERCOT-specific types
 - `app/lib/forecast/*`
@@ -131,6 +194,7 @@ Current tests live under `__tests__` directories:
 - `app/lib/__tests__/history.test.ts`
 - `app/lib/__tests__/ercot-client.test.ts`
 - `app/api/forecast/__tests__/route.test.ts`
+- `app/api/backtest/__tests__/route.test.ts`
 
 Run:
 
@@ -152,4 +216,4 @@ Open:
 
 ## Next Planned Phase
 
-- Backtesting mode to compare forecasted values vs actual historical prices and report MAE/RMSE/bias.
+- Surface backtest mode in UI (forecast-vs-actual chart/table + metrics panel).

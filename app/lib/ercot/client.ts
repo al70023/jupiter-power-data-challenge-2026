@@ -14,6 +14,7 @@ import { requireEnv } from "@/app/lib/shared/env";
 import { fetchWithRetry } from "@/app/lib/shared/http";
 
 let cachedToken: { token: string; expMs: number } | null = null;
+let inFlightTokenPromise: Promise<string> | null = null;
 
 export async function fetchSppNodeZoneHub(params: {
   deliveryDateFrom: string;
@@ -56,36 +57,45 @@ export async function fetchSppNodeZoneHub(params: {
 async function getIdTokenCached(): Promise<string> {
   const now = Date.now();
   if (cachedToken && cachedToken.expMs > now) return cachedToken.token;
+  if (inFlightTokenPromise) return inFlightTokenPromise;
 
-  const username = requireEnv("ERCOT_USERNAME");
-  const password = requireEnv("ERCOT_PASSWORD");
+  inFlightTokenPromise = (async () => {
+    const username = requireEnv("ERCOT_USERNAME");
+    const password = requireEnv("ERCOT_PASSWORD");
 
-  const body = new URLSearchParams({
-    username,
-    password,
-    grant_type: "password",
-    scope: ERCOT_SCOPE,
-    client_id: ERCOT_CLIENT_ID,
-    response_type: "id_token",
-  });
+    const body = new URLSearchParams({
+      username,
+      password,
+      grant_type: "password",
+      scope: ERCOT_SCOPE,
+      client_id: ERCOT_CLIENT_ID,
+      response_type: "id_token",
+    });
 
-  const res = await fetchWithRetry({
-    input: ERCOT_TOKEN_URL,
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      cache: "no-store",
-    },
-    label: "ERCOT token",
-    maxRetries: ERCOT_MAX_HTTP_RETRIES,
-    baseRetryMs: ERCOT_BASE_RETRY_MS,
-    timeoutMs: ERCOT_HTTP_TIMEOUT_MS,
-  });
+    const res = await fetchWithRetry({
+      input: ERCOT_TOKEN_URL,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        cache: "no-store",
+      },
+      label: "ERCOT token",
+      maxRetries: ERCOT_MAX_HTTP_RETRIES,
+      baseRetryMs: ERCOT_BASE_RETRY_MS,
+      timeoutMs: ERCOT_HTTP_TIMEOUT_MS,
+    });
 
-  const json = (await res.json()) as { id_token?: string };
-  if (!json.id_token) throw new Error("ERCOT token response missing id_token");
+    const json = (await res.json()) as { id_token?: string };
+    if (!json.id_token) throw new Error("ERCOT token response missing id_token");
 
-  cachedToken = { token: json.id_token, expMs: now + 50 * 60 * 1000 };
-  return json.id_token;
+    cachedToken = { token: json.id_token, expMs: Date.now() + 50 * 60 * 1000 };
+    return json.id_token;
+  })();
+
+  try {
+    return await inFlightTokenPromise;
+  } finally {
+    inFlightTokenPromise = null;
+  }
 }
