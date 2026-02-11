@@ -15,6 +15,15 @@ type ForecastChartProps = {
 export function ForecastChart(props: ForecastChartProps) {
   const { chartModel, title = "Forecast Curves", ariaLabel, tooltipExtraLinesForSlot } = props;
   const [hovered, setHovered] = useState<{ marker: ChartMarker } | null>(null);
+  const majorSlots = useMemo(() => new Set(chartModel.xTicks.map((tick) => tick.slot)), [chartModel.xTicks]);
+  const minorTicks = useMemo(() => {
+    return Array.from({ length: 96 }, (_, slot) => slot)
+      .filter((slot) => !majorSlots.has(slot))
+      .map((slot) => ({
+        slot,
+        x: chartModel.xMin + (chartModel.xMax - chartModel.xMin) * (slot / 95),
+      }));
+  }, [chartModel.xMin, chartModel.xMax, majorSlots]);
   const valuesBySlot = useMemo(() => {
     const maps = new Map<string, Map<number, number>>();
     for (const series of chartModel.series) {
@@ -97,7 +106,7 @@ export function ForecastChart(props: ForecastChartProps) {
           />
           {chartModel.series.map((series) => (
             <g key={series.key}>
-              <polyline fill="none" stroke={series.color} strokeWidth="2" points={series.points} />
+              <polyline fill="none" stroke={series.color} strokeWidth="1.5" points={series.points} />
               {series.markers.map((m, idx) => (
                 <circle
                   key={`${series.key}-${idx}`}
@@ -169,6 +178,17 @@ export function ForecastChart(props: ForecastChartProps) {
                 {tick.label}
               </text>
             </g>
+          ))}
+          {minorTicks.map((tick) => (
+            <line
+              key={`xm-${tick.slot}`}
+              x1={tick.x}
+              y1={chartModel.yMaxPx}
+              x2={tick.x}
+              y2={chartModel.yMaxPx + 3}
+              stroke="#d1d5db"
+              strokeWidth="1"
+            />
           ))}
 
           <text

@@ -47,7 +47,7 @@ function computeGenericChartModel<T extends { slot: number; ts: string }>(
     return { value, y };
   });
 
-  const xTickSlots = [0, 12, 24, 36, 48, 60, 72, 84, 95];
+  const xTickSlots = [...Array.from({ length: 24 }, (_, hour) => hour * 4), 95];
   const xTicks = xTickSlots.map((slot) => {
     const t = slot / 95;
     const x = xMin + (xMax - xMin) * t;
@@ -55,22 +55,22 @@ function computeGenericChartModel<T extends { slot: number; ts: string }>(
     const mm = String((slot * 15) % 60).padStart(2, "0");
     return { slot, x, label: `${hh}:${mm}` };
   });
+  const denom = Math.max(rows.length - 1, 1);
+  const xRange = xMax - xMin;
 
   const series = defs.map((def) => ({
     key: def.key,
     label: def.label,
     color: def.color,
-    markers: xTicks
-      .map((tick) => {
-        const row = rows[tick.slot];
-        if (!row) return null;
+    markers: rows
+      .map((row, i) => {
         const value = def.pick(row);
         if (value === null) return null;
         return {
-          slot: tick.slot,
-          ts: row.ts ?? tick.label,
+          slot: row.slot,
+          ts: row.ts,
           value,
-          x: tick.x,
+          x: xMin + (i / denom) * xRange,
           y: valueToY({ value, minY, maxY, yMinPx, yMaxPx }),
         };
       })
